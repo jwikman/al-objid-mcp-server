@@ -31,6 +31,8 @@ type ToolCallResponse = {
   isError?: boolean;
 };
 
+import { getToolsForMode, isToolAvailable } from './tools/toolFilter';
+
 class ALObjectIdServer {
   private server: Server;
   private backend: BackendService;
@@ -254,6 +256,11 @@ These work without prerequisites:
     this.persistence = ConfigPersistence.getInstance();
     this.logger = Logger.getInstance();
 
+    // Log the server mode
+    const mode = process.env.MCP_MODE?.toLowerCase();
+    const actualMode = mode === 'lite' ? 'LITE' : 'FULL';
+    this.logger.info(`AL Object ID Ninja MCP Server starting in ${actualMode} mode`);
+
     // Setup handlers
     this.setupHandlers();
 
@@ -265,470 +272,13 @@ These work without prerequisites:
   }
 
   private setupHandlers(): void {
-    // Phase 1: Core Object ID Management
+    // Get tools based on mode
+    const tools = getToolsForMode();
+    
+    // Set up the list tools handler
     this.server.setRequestHandler(
       ListToolsRequestSchema,
-      async () => ({
-        tools: [
-          // Core ID Management
-          {
-            name: "get-next-id",
-            description: "Get the next available object ID for a specific type",
-            inputSchema: {
-              type: "object",
-              properties: {
-                objectType: {
-                  type: "string",
-                  enum: ["table", "page", "report", "codeunit", "query", "xmlport", "enum"],
-                  description: "Type of AL object"
-                },
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app (optional, uses active app if not provided)"
-                },
-                ranges: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      from: { type: "number" },
-                      to: { type: "number" }
-                    }
-                  },
-                  description: "Optional custom ranges to search within"
-                }
-              },
-              required: ["objectType"]
-            }
-          },
-          {
-            name: "sync-object-ids",
-            description: "Sync consumed object IDs with the backend",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                ids: {
-                  type: "object",
-                  description: "Object IDs by type to sync"
-                }
-              },
-              required: ["ids"]
-            }
-          },
-
-          // Phase 2: Authorization & Backend
-          {
-            name: "check-authorization",
-            description: "Check if an AL app is authorized",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                }
-              },
-              required: ["appPath"]
-            }
-          },
-          {
-            name: "authorize-app",
-            description: "Authorize an AL app with the backend",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                }
-              },
-              required: ["appPath"]
-            }
-          },
-          {
-            name: "get-consumption-report",
-            description: "Get a consumption report for an app",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                objectTypes: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "Object types to include in report"
-                }
-              },
-              required: ["appPath"]
-            }
-          },
-
-          // Phase 3: Workspace Management
-          {
-            name: "scan-workspace",
-            description: "Scan a workspace for AL apps",
-            inputSchema: {
-              type: "object",
-              properties: {
-                workspacePath: {
-                  type: "string",
-                  description: "Path to the workspace root"
-                }
-              },
-              required: ["workspacePath"]
-            }
-          },
-          {
-            name: "get-workspace-info",
-            description: "Get information about the current workspace",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-          {
-            name: "set-active-app",
-            description: "Set the active AL app in the workspace",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app to activate"
-                }
-              },
-              required: ["appPath"]
-            }
-          },
-
-          // Field Management
-          {
-            name: "get-next-field-id",
-            description: "Get the next available field ID for a table",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                tableId: {
-                  type: "number",
-                  description: "ID of the table"
-                },
-                isExtension: {
-                  type: "boolean",
-                  description: "Whether this is for a table extension"
-                }
-              },
-              required: ["tableId"]
-            }
-          },
-          {
-            name: "get-next-enum-value-id",
-            description: "Get the next available enum value ID",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                enumId: {
-                  type: "number",
-                  description: "ID of the enum"
-                },
-                isExtension: {
-                  type: "boolean",
-                  description: "Whether this is for an enum extension"
-                }
-              },
-              required: ["enumId"]
-            }
-          },
-
-          // Collision Detection
-          {
-            name: "check-collision",
-            description: "Check if an object ID would cause a collision",
-            inputSchema: {
-              type: "object",
-              properties: {
-                objectType: {
-                  type: "string",
-                  description: "Type of AL object"
-                },
-                id: {
-                  type: "number",
-                  description: "ID to check"
-                },
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                }
-              },
-              required: ["objectType", "id"]
-            }
-          },
-          {
-            name: "check-range-overlaps",
-            description: "Check for range overlaps between apps",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-
-          // Polling Management
-          {
-            name: "start-polling",
-            description: "Start the polling service for real-time updates",
-            inputSchema: {
-              type: "object",
-              properties: {
-                interval: {
-                  type: "number",
-                  description: "Polling interval in milliseconds"
-                },
-                features: {
-                  type: "object",
-                  properties: {
-                    consumption: { type: "boolean" },
-                    collisions: { type: "boolean" },
-                    pools: { type: "boolean" }
-                  }
-                }
-              }
-            }
-          },
-          {
-            name: "stop-polling",
-            description: "Stop the polling service",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-          {
-            name: "get-polling-status",
-            description: "Get the current polling status",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-
-          // Phase 4: Interactive Assignment
-          {
-            name: "assign-ids",
-            description: "Interactively assign object IDs with collision checking",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                objectType: {
-                  type: "string",
-                  description: "Type of AL object"
-                },
-                count: {
-                  type: "number",
-                  description: "Number of IDs to assign"
-                },
-                ranges: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      from: { type: "number" },
-                      to: { type: "number" }
-                    }
-                  }
-                },
-                description: {
-                  type: "string",
-                  description: "Description of the assignment"
-                },
-                checkCollisions: {
-                  type: "boolean",
-                  description: "Check for collisions"
-                },
-                suggestAlternatives: {
-                  type: "boolean",
-                  description: "Suggest alternatives if collisions found"
-                }
-              },
-              required: ["objectType"]
-            }
-          },
-          {
-            name: "batch-assign",
-            description: "Batch assign IDs for multiple object types",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                assignments: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      objectType: { type: "string" },
-                      count: { type: "number" },
-                      description: { type: "string" }
-                    }
-                  }
-                }
-              },
-              required: ["assignments"]
-            }
-          },
-          {
-            name: "reserve-range",
-            description: "Reserve a range of IDs for future use",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                objectType: {
-                  type: "string",
-                  description: "Type of AL object"
-                },
-                from: {
-                  type: "number",
-                  description: "Start of range"
-                },
-                to: {
-                  type: "number",
-                  description: "End of range"
-                },
-                description: {
-                  type: "string",
-                  description: "Description of the reservation"
-                }
-              },
-              required: ["objectType", "from", "to"]
-            }
-          },
-          {
-            name: "get-suggestions",
-            description: "Get ID assignment suggestions based on patterns",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Path to the AL app"
-                },
-                objectType: {
-                  type: "string",
-                  description: "Type of AL object"
-                },
-                pattern: {
-                  type: "string",
-                  description: "Pattern to match (e.g., '5xxx' for IDs starting with 5)"
-                }
-              },
-              required: ["objectType"]
-            }
-          },
-          {
-            name: "get-assignment-history",
-            description: "Get assignment history",
-            inputSchema: {
-              type: "object",
-              properties: {
-                appPath: {
-                  type: "string",
-                  description: "Filter by app"
-                },
-                objectType: {
-                  type: "string",
-                  description: "Filter by object type"
-                },
-                limit: {
-                  type: "number",
-                  description: "Maximum number of entries"
-                }
-              }
-            }
-          },
-
-          // Configuration Management
-          {
-            name: "save-preferences",
-            description: "Save user preferences",
-            inputSchema: {
-              type: "object",
-              properties: {
-                preferences: {
-                  type: "object",
-                  properties: {
-                    defaultRanges: { type: "array" },
-                    autoSync: { type: "boolean" },
-                    collisionChecking: { type: "boolean" },
-                    suggestAlternatives: { type: "boolean" },
-                    logLevel: { type: "string" }
-                  }
-                }
-              },
-              required: ["preferences"]
-            }
-          },
-          {
-            name: "get-preferences",
-            description: "Get current preferences",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-          {
-            name: "export-config",
-            description: "Export configuration to JSON",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          },
-          {
-            name: "import-config",
-            description: "Import configuration from JSON",
-            inputSchema: {
-              type: "object",
-              properties: {
-                config: {
-                  type: "string",
-                  description: "JSON configuration to import"
-                }
-              },
-              required: ["config"]
-            }
-          },
-          {
-            name: "get-statistics",
-            description: "Get usage statistics",
-            inputSchema: {
-              type: "object",
-              properties: {}
-            }
-          }
-        ]
-      })
+      async () => ({ tools })
     );
 
     // Tool call handler
@@ -736,6 +286,19 @@ These work without prerequisites:
       CallToolRequestSchema,
       async (request) => {
         const { name, arguments: args } = request.params;
+
+        // Check if tool is available in current mode
+        if (!isToolAvailable(name)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Tool '${name}' is not available in current mode`
+              }
+            ],
+            isError: true
+          };
+        }
 
         try {
           switch (name) {

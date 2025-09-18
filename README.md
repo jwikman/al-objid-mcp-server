@@ -32,8 +32,11 @@ npm run build
 Add the MCP server to Claude Code using the `claude` CLI tool in your terminal:
 
 ```bash
-# Add the MCP server (Change path)
+# Add the MCP server in FULL mode (default - all 25 tools)
 claude mcp add objid node "U:\Git\objid-mcp\mcp-server\dist\server.js"
+
+# Add the MCP server in LITE mode in current project (only 3 essential tools)
+claude mcp add objidlite -s project -- node "U:\Git\objid-mcp\mcp-server\dist\server.js"
 
 # Verify it was added
 claude mcp list
@@ -49,11 +52,46 @@ To remove the server later if needed:
 claude mcp remove objid
 ```
 
+## 🎛️ Server Modes (Full vs Lite)
+
+The MCP server can run in two modes to suit different needs:
+
+### Full Mode (Default)
+- **All 25 tools** available
+- Complete feature set for comprehensive AL development
+
+### Lite Mode
+- **Only 3 essential tools** available:
+  - `scan-workspace` - Discover AL apps in your workspace
+  - `set-active-app` - Select which app to work with
+  - `get-next-id` - Get the next available object ID
+- Lower overhead when full functionality isn't needed
+
+The server will log which mode it's running in at startup:
+- Full mode: `"Running in FULL mode - exposing all 25 tools"`
+- Lite mode: `"Running in LITE mode - exposing 3 essential tools"`
+
 ## Configuration
 
 ### Default Configuration (No Setup Required)
 
 The MCP server works out-of-the-box with the default AL Object ID Ninja backend (`vjekocom-alext-weu.azurewebsites.net`). **No configuration files or environment variables are needed for standard use.**
+
+### Server Mode Configuration (Optional)
+
+Control whether the server runs in full or lite mode:
+
+```bash
+# Run in lite mode (Windows PowerShell)
+$env:MCP_MODE = "lite"
+npm start
+
+# Run in lite mode (Windows Command Prompt)
+set MCP_MODE=lite && npm start
+
+# Run in lite mode (Linux/Mac)
+MCP_MODE=lite npm start
+```
 
 ### Custom Backend Configuration (Optional)
 
@@ -64,6 +102,7 @@ Only needed if you're using your own Azure Functions backend:
 Create a `.env` file:
 
 ```bash
+MCP_MODE=lite                                    # Server mode: 'lite' or 'full' (default: full)
 NINJA_BACKEND_URL=your-backend.azurewebsites.net
 NINJA_API_KEY=your-api-key
 NINJA_POLL_URL=your-polling.azurewebsites.net
