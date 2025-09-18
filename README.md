@@ -4,10 +4,11 @@ MCP (Model Context Protocol) server for AL Object ID management in Microsoft Dyn
 
 ## Overview
 
-This MCP server exposes the complete functionality of the AL Object ID Ninja VS Code extension as a service consumable by any MCP-compatible client. It provides intelligent object ID management, real-time synchronization with Azure Functions backend, collision prevention, interactive assignment, and comprehensive pool management for AL development teams. 
+This MCP server exposes the complete functionality of the AL Object ID Ninja VS Code extension as a service consumable by any MCP-compatible client. It provides intelligent object ID management, real-time synchronization with Azure Functions backend, collision prevention, interactive assignment, and comprehensive pool management for AL development teams.
 All Vjeko's original features are included.
 
 **🎯 Current Status: 80% Complete - Fully Functional with Advanced Features**
+
 - **25 MCP Tools** implemented and tested
 - **100% integration test pass rate** against live backend
 - **Interactive assignment with collision detection**
@@ -38,11 +39,12 @@ claude mcp add objid node "U:\Git\objid-mcp\mcp-server\dist\server.js"
 claude mcp list
 ```
 
-Replace `C:\Git\objid-mcp` with your actual installation path.
+Replace `U:\Git\objid-mcp\mcp-server\dist\server.js` with your actual installation path.
 
 That's it! The server uses the default AL Object ID Ninja backend automatically. No API keys or environment variables required. The server will be available in Claude Code after adding it.
 
 To remove the server later if needed:
+
 ```bash
 claude mcp remove objid
 ```
@@ -107,33 +109,40 @@ npm run watch  # Build in watch mode
 ## 🛠️ Available MCP Tools (25 Complete)
 
 ### Core ID Management
+
 - **`get-next-id`** - Get the next available object ID for a specific type
 - **`sync-object-ids`** - Sync consumed object IDs with the backend
 
 ### Authorization & Backend Communication
+
 - **`check-authorization`** - Check if an AL app is authorized with the backend
 - **`authorize-app`** - Authorize an AL app with the backend using auth key
 - **`get-consumption-report`** - Get detailed consumption report for an app
 
 ### Workspace Management
+
 - **`scan-workspace`** - Scan a workspace for AL apps and detect configurations
 - **`get-workspace-info`** - Get information about the current workspace state
 - **`set-active-app`** - Set the active AL app in multi-app workspaces
 
 ### Field & Enum Management
+
 - **`get-next-field-id`** - Get next available field ID for table/table extensions
 - **`get-next-enum-value-id`** - Get next available enum value ID
 
 ### Collision Detection & Prevention
+
 - **`check-collision`** - Check if an object ID would cause a collision
 - **`check-range-overlaps`** - Check for range overlaps between apps
 
 ### Real-time Polling System
+
 - **`start-polling`** - Start real-time backend synchronization
 - **`stop-polling`** - Stop the polling service
 - **`get-polling-status`** - Get current polling status and metrics
 
 ### Interactive Assignment (Phase 4)
+
 - **`assign-ids`** - Interactively assign object IDs with collision checking
 - **`batch-assign`** - Batch assign IDs for multiple object types
 - **`reserve-range`** - Reserve ID ranges for future use
@@ -141,6 +150,7 @@ npm run watch  # Build in watch mode
 - **`get-assignment-history`** - View assignment history and patterns
 
 ### Configuration & Persistence
+
 - **`save-preferences`** - Save user preferences (auto-sync, collision checking, etc.)
 - **`get-preferences`** - Get current user preferences
 - **`export-config`** - Export complete configuration to JSON
@@ -186,11 +196,13 @@ mcp-server/
 ## 🧪 Testing & Quality Assurance
 
 ### Comprehensive Test Suite
+
 The MCP server includes both unit tests and **live backend integration tests** that validate against the real Azure Functions API.
 
 **🎯 Current Test Status: 100% Pass Rate (8/8 Integration Tests)**
 
 ### Test Commands
+
 ```bash
 # Unit and integration tests
 npm test                    # Run Jest test suite
@@ -207,6 +219,7 @@ npm run lint              # ESLint code quality checks
 ```
 
 ### Live Backend Integration Tests ✅
+
 Tests run against the real Azure Functions backend at `https://vjekocom-alext-weu.azurewebsites.net`:
 
 1. ✅ **App Lifecycle Testing**
@@ -233,6 +246,7 @@ Tests run against the real Azure Functions backend at `https://vjekocom-alext-we
    - Response time monitoring (<500ms average)
 
 ### Test Environment Setup
+
 ```bash
 # Required environment variables
 export NINJA_BACKEND_URL=https://vjekocom-alext-weu.azurewebsites.net
@@ -260,12 +274,14 @@ npm run watch         # Build in watch mode
 **Current Status: Production-Ready MCP Server with Advanced Features**
 
 ### ✅ Phase 1: Foundation (Complete)
+
 - ✅ MCP server infrastructure with TypeScript strict mode
 - ✅ Comprehensive configuration management (.objidconfig, app.json, env vars)
 - ✅ Complete type system from VS Code extension
 - ✅ App identification with SHA256 hashing
 
 ### ✅ Phase 2: Backend Communication (Complete)
+
 - ✅ Production-grade HTTP client with retry logic
 - ✅ Complete Azure Functions V2 API integration (8 endpoints)
 - ✅ Advanced authentication (X-Functions-Key, auth tokens)
@@ -273,12 +289,14 @@ npm run watch         # Build in watch mode
 - ✅ 100% integration test pass rate against live backend
 
 ### ✅ Phase 3: MCP Tools Implementation (Complete)
+
 - ✅ **25 MCP Tools** covering all AL object ID operations
 - ✅ Advanced workspace detection and multi-app support
 - ✅ Real-time workspace monitoring and app discovery
 - ✅ Complete tool discovery with comprehensive documentation
 
 ### ✅ Phase 4: Enhanced Features (Complete)
+
 - ✅ **Field and enum value ID management**
 - ✅ **Real-time collision detection** with automatic prevention
 - ✅ **Interactive assignment mode** with intelligent suggestions
@@ -287,6 +305,7 @@ npm run watch         # Build in watch mode
 - ✅ **Pool management** with create/join/leave operations
 
 ### 🟡 Phase 5: Production Readiness (60% Complete)
+
 - ✅ Comprehensive error handling and recovery
 - ✅ Security features with data encryption
 - ✅ Performance monitoring and benchmarking
