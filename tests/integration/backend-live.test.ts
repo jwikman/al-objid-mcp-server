@@ -231,7 +231,15 @@ describeIntegration('Backend Service - Live Integration Tests', () => {
         return;
       }
 
-      const result = await backendService.createPool(TEST_CONFIG.testAppId, testAuthKey);
+      const result = await backendService.createPool(
+        TEST_CONFIG.testAppId,
+        testAuthKey,
+        'Test Pool',
+        'test-join-key',
+        'test-management-secret',
+        [{ appId: TEST_CONFIG.testAppId, name: 'Test App' }],
+        false
+      );
 
       expect(result).toBeDefined();
       expect(result?.poolId).toBeDefined();
@@ -269,7 +277,11 @@ describeIntegration('Backend Service - Live Integration Tests', () => {
       }
 
       // Now join the pool
-      const result = await backendService.joinPool(secondAppId, secondAuthKey, poolId);
+      const result = await backendService.joinPool(
+        poolId,
+        'test-join-key',
+        [{ appId: secondAppId, name: 'Second Test App' }]
+      );
 
       expect(result).toBe(true);
 

@@ -142,13 +142,18 @@ export class ErrorHandler {
       return ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(error.code || '');
     }
 
+    // Check for raw error objects with network error codes
+    if (error.code) {
+      return ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(error.code);
+    }
+
     // Backend errors: retry on 5xx and specific 4xx codes
     if (error instanceof BackendError) {
       return error.statusCode >= 500 || error.statusCode === 429;
     }
 
-    // Check raw error
-    if (error.status) {
+    // Check raw error with status
+    if (error.status !== undefined) {
       return error.status >= 500 || error.status === 429 || error.status === 0;
     }
 

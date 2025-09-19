@@ -2,18 +2,15 @@ import { Logger, LogLevel } from '../../src/lib/utils/Logger';
 
 describe('Logger', () => {
   let logger: Logger;
-  let consoleErrorSpy: jest.SpyInstance;
-  let consoleLogSpy: jest.SpyInstance;
+  let stderrSpy: jest.SpyInstance;
 
   beforeEach(() => {
     logger = Logger.getInstance();
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation();
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleLogSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
   describe('getInstance', () => {
@@ -32,8 +29,7 @@ describe('Logger', () => {
       logger.info('Test info');
       logger.verbose('Test verbose');
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(0);
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should log errors and info at Info level', () => {
@@ -43,8 +39,7 @@ describe('Logger', () => {
       logger.info('Test info');
       logger.verbose('Test verbose');
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+      expect(stderrSpy).toHaveBeenCalledTimes(2); // error and info both go to stderr
     });
 
     it('should log all messages at Verbose level', () => {
@@ -54,8 +49,7 @@ describe('Logger', () => {
       logger.info('Test info');
       logger.verbose('Test verbose');
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(2);
+      expect(stderrSpy).toHaveBeenCalledTimes(3); // error, info, and verbose all go to stderr
     });
 
     it('should log all messages including debug at Debug level', () => {
@@ -66,8 +60,7 @@ describe('Logger', () => {
       logger.verbose('Test verbose');
       logger.debug('Test debug');
 
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-      expect(consoleLogSpy).toHaveBeenCalledTimes(3);
+      expect(stderrSpy).toHaveBeenCalledTimes(4); // error, info, verbose, and debug all go to stderr
     });
   });
 
@@ -86,8 +79,13 @@ describe('Logger', () => {
 
       logger.verbose('Test', sensitiveData);
 
-      const logCall = consoleLogSpy.mock.calls[0];
-      const loggedData = logCall[1];
+      const logCall = stderrSpy.mock.calls[0];
+      const logOutput = logCall[0].toString();
+
+      // Extract JSON from log output (format: [VERBOSE] timestamp Test {json})
+      const jsonMatch = logOutput.match(/\[VERBOSE\].*Test (.*)\n?$/);
+      expect(jsonMatch).toBeTruthy();
+      const loggedData = JSON.parse(jsonMatch![1]);
 
       expect(loggedData.authKey).toBe('***REDACTED***');
       expect(loggedData.apiKey).toBe('***REDACTED***');
@@ -112,8 +110,13 @@ describe('Logger', () => {
 
       logger.verbose('Test', nestedData);
 
-      const logCall = consoleLogSpy.mock.calls[0];
-      const loggedData = logCall[1];
+      const logCall = stderrSpy.mock.calls[0];
+      const logOutput = logCall[0].toString();
+
+      // Extract JSON from log output
+      const jsonMatch = logOutput.match(/\[VERBOSE\].*Test (.*)\n?$/);
+      expect(jsonMatch).toBeTruthy();
+      const loggedData = JSON.parse(jsonMatch![1]);
 
       expect(loggedData.level1.authKey).toBe('***REDACTED***');
       expect(loggedData.level1.level2.apiKey).toBe('***REDACTED***');
@@ -130,8 +133,13 @@ describe('Logger', () => {
 
       logger.verbose('Test', arrayData);
 
-      const logCall = consoleLogSpy.mock.calls[0];
-      const loggedData = logCall[1];
+      const logCall = stderrSpy.mock.calls[0];
+      const logOutput = logCall[0].toString();
+
+      // Extract JSON from log output
+      const jsonMatch = logOutput.match(/\[VERBOSE\].*Test (.*)\n?$/);
+      expect(jsonMatch).toBeTruthy();
+      const loggedData = JSON.parse(jsonMatch![1]);
 
       expect(loggedData[0].authKey).toBe('***REDACTED***');
       expect(loggedData[0].value).toBe('visible1');
@@ -147,11 +155,16 @@ describe('Logger', () => {
 
       logger.error('An error occurred', error);
 
-      const logCall = consoleErrorSpy.mock.calls[0];
-      const loggedError = logCall[1];
+      const logCall = stderrSpy.mock.calls[0];
+      const logOutput = logCall[0].toString();
 
-      expect(loggedError.message).toBe('Test error message');
-      expect(loggedError.stack).toBe('Error stack trace');
+      // Extract JSON from error log output
+      const jsonMatch = logOutput.match(/\[ERROR\].*An error occurred (.*)\n?$/);
+      expect(jsonMatch).toBeTruthy();
+      const loggedData = JSON.parse(jsonMatch![1]);
+
+      expect(loggedData.message).toBe('Test error message');
+      expect(loggedData.stack).toBe('Error stack trace');
     });
   });
 
@@ -164,12 +177,20 @@ describe('Logger', () => {
         data: 'value'
       });
 
-      const logCall = consoleLogSpy.mock.calls[0];
-      expect(logCall[0]).toContain('[REQUEST]');
-      expect(logCall[0]).toContain('POST');
-      expect(logCall[0]).toContain('https://api.example.com/test');
-      expect(logCall[1].authKey).toBe('***REDACTED***');
-      expect(logCall[1].data).toBe('value');
+      const logCall = stderrSpy.mock.calls[0];
+      const logOutput = logCall[0].toString();
+
+      expect(logOutput).toContain('[REQUEST]');
+      expect(logOutput).toContain('POST');
+      expect(logOutput).toContain('https://api.example.com/test');
+
+      // Extract JSON from log output
+      const jsonMatch = logOutput.match(/\[REQUEST\].*https:\/\/api\.example\.com\/test (.*)\n?$/);
+      expect(jsonMatch).toBeTruthy();
+      const loggedData = JSON.parse(jsonMatch![1]);
+
+      expect(loggedData.authKey).toBe('***REDACTED***');
+      expect(loggedData.data).toBe('value');
     });
 
     it('should log responses', () => {
@@ -178,15 +199,17 @@ describe('Logger', () => {
       logger.response(200, 'https://api.example.com/test', { result: 'success' });
       logger.response(404, 'https://api.example.com/notfound', { error: 'Not found' });
 
-      const successCall = consoleLogSpy.mock.calls[0];
-      expect(successCall[0]).toContain('[RESPONSE]');
-      expect(successCall[0]).toContain('SUCCESS');
-      expect(successCall[0]).toContain('200');
+      const successCall = stderrSpy.mock.calls[0];
+      const successOutput = successCall[0].toString();
+      expect(successOutput).toContain('[RESPONSE]');
+      expect(successOutput).toContain('SUCCESS');
+      expect(successOutput).toContain('200');
 
-      const errorCall = consoleLogSpy.mock.calls[1];
-      expect(errorCall[0]).toContain('[RESPONSE]');
-      expect(errorCall[0]).toContain('FAILURE');
-      expect(errorCall[0]).toContain('404');
+      const errorCall = stderrSpy.mock.calls[1];
+      const errorOutput = errorCall[0].toString();
+      expect(errorOutput).toContain('[RESPONSE]');
+      expect(errorOutput).toContain('FAILURE');
+      expect(errorOutput).toContain('404');
     });
   });
 });

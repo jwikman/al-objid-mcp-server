@@ -12,6 +12,25 @@ jest.mock('../../src/lib/backend/HttpClient');
 // Mock WorkspaceManager
 jest.mock('../../src/lib/workspace/WorkspaceManager');
 
+// Mock ConfigManager with polling backend settings
+jest.mock('../../src/lib/config/ConfigManager', () => ({
+  ConfigManager: {
+    getInstance: jest.fn(() => ({
+      loadConfig: jest.fn(() => ({
+        backend: {
+          url: 'https://api.objidconfig.com',
+          apiKey: 'test-api-key',
+          pollUrl: 'https://poll.objidconfig.com',
+          pollKey: 'test-poll-key'
+        },
+        defaults: {
+          verboseLogging: false
+        }
+      }))
+    }))
+  }
+}));
+
 describe('Pool ID Resolution', () => {
   let backendService: BackendService;
   let mockHttpClient: jest.Mocked<HttpClient>;
@@ -21,6 +40,7 @@ describe('Pool ID Resolution', () => {
   const poolAppId = '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'; // 64 char hex
 
   beforeEach(() => {
+
     backendService = new BackendService();
     mockHttpClient = (backendService as any).httpClient as jest.Mocked<HttpClient>;
 
@@ -481,6 +501,29 @@ describe('Pool ID Resolution', () => {
       );
     });
 
+    it('should return null when polling backend is not configured for checkUpdate', async () => {
+      // Mock the sendRequest to throw an error for missing polling backend config
+      const originalSendRequest = (backendService as any).sendRequest;
+      (backendService as any).sendRequest = jest.fn().mockImplementation((path, method, data, usePollBackend) => {
+        if (usePollBackend) {
+          throw new Error('Backend URL not configured for polling service');
+        }
+        return originalSendRequest.call(backendService, path, method, data, usePollBackend);
+      });
+
+      const request = {
+        appId: regularAppId,
+        lastCheck: Date.now()
+      };
+
+      const result = await backendService.checkUpdate(request);
+
+      expect(result).toBeNull(); // Should return null when polling backend isn't configured
+
+      // Restore original method
+      (backendService as any).sendRequest = originalSendRequest;
+    });
+
     it('should check multiple apps', async () => {
       mockHttpClient.send.mockResolvedValue({
         status: 200,
@@ -503,6 +546,30 @@ describe('Pool ID Resolution', () => {
           data: payload
         })
       );
+    });
+
+    it('should return null when polling backend is not configured for check', async () => {
+      // Mock the sendRequest to throw an error for missing polling backend config
+      const originalSendRequest = (backendService as any).sendRequest;
+      (backendService as any).sendRequest = jest.fn().mockImplementation((path, method, data, usePollBackend) => {
+        if (usePollBackend) {
+          throw new Error('Backend URL not configured for polling service');
+        }
+        return originalSendRequest.call(backendService, path, method, data, usePollBackend);
+      });
+
+      const payload = [{
+        appId: regularAppId,
+        authKey: 'test-auth-key',
+        authorization: {}
+      }];
+
+      const result = await backendService.check(payload);
+
+      expect(result).toBeNull(); // Should return null when polling backend isn't configured
+
+      // Restore original method
+      (backendService as any).sendRequest = originalSendRequest;
     });
   });
 });

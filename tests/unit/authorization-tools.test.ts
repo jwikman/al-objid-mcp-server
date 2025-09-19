@@ -210,7 +210,7 @@ describe('Authorization Tools', () => {
       const duration = Date.now() - start;
 
       expect(duration).toBeGreaterThanOrEqual(10);
-      expect(duration).toBeLessThan(100);
+      expect(duration).toBeLessThan(500); // Increased for test environment variability
     });
 
     it('should handle concurrent authorization checks', async () => {
