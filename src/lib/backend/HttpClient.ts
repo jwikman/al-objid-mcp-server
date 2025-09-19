@@ -4,7 +4,7 @@ import * as http from 'http';
 export interface HttpRequest {
   hostname: string;
   path: string;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   data?: any;
   timeout?: number;

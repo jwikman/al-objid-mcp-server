@@ -314,52 +314,62 @@ describe('BackendService', () => {
 
   describe('getConsumption', () => {
     it('should successfully get consumption report', async () => {
-      const appId = 'test-app-id';
-      const authKey = 'auth-key-123';
-      const type = ALObjectType.table;
+      const request = {
+        appId: 'test-app-id',
+        authKey: 'auth-key-123'
+      };
 
       mockHttpClient.send.mockResolvedValue({
         status: 200,
-        value: [50000, 50001, 50002]
+        value: {
+          table: [50000, 50001, 50002],
+          page: [60000, 60001]
+        }
       });
 
-      const result = await backendService.getConsumption(appId, authKey, type);
+      const result = await backendService.getConsumption(request);
 
-      expect(result).toEqual([50000, 50001, 50002]);
+      expect(result).toEqual({
+        table: [50000, 50001, 50002],
+        page: [60000, 60001]
+      });
       expect(mockHttpClient.send).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'GET',
-          path: `/api/v2/getConsumption?appId=${encodeURIComponent(appId)}&authKey=${encodeURIComponent(authKey)}&type=${type}`
+          path: '/api/v2/getConsumption',
+          data: request
         })
       );
     });
 
     it('should handle empty consumption', async () => {
-      const appId = 'test-app-id';
-      const authKey = 'auth-key-123';
-      const type = ALObjectType.table;
+      const request = {
+        appId: 'test-app-id',
+        authKey: 'auth-key-123'
+      };
 
       mockHttpClient.send.mockResolvedValue({
         status: 200,
-        value: []
+        value: {}
       });
 
-      const result = await backendService.getConsumption(appId, authKey, type);
+      const result = await backendService.getConsumption(request);
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({});
     });
 
     it('should return undefined on error', async () => {
-      const appId = 'test-app-id';
-      const authKey = 'auth-key-123';
-      const type = ALObjectType.table;
+      const request = {
+        appId: 'test-app-id',
+        authKey: 'auth-key-123'
+      };
 
       mockHttpClient.send.mockResolvedValue({
         status: 404,
         error: { message: 'Not found' }
       });
 
-      const result = await backendService.getConsumption(appId, authKey, type);
+      const result = await backendService.getConsumption(request);
 
       expect(result).toBeUndefined();
       expect(mockLogger.error).toHaveBeenCalled();

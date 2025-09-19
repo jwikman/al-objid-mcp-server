@@ -628,10 +628,17 @@ These work without prerequisites:
       };
     }
 
+    // Use pool ID if available (matches VSCode extension behavior)
+    const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+    
+    // Support sync modes: merge (UPDATE/PATCH) or replace (REPLACE/POST)
+    const merge = args.merge === true || args.mode === 'UPDATE' || args.mode === 'merge';
+    
     const result = await this.backend.syncIds({
-      appId: app.appId,
+      appId,
       authKey: app.authKey,
-      ids: args.ids
+      ids: args.ids,
+      merge
     });
 
     if (result) {
@@ -642,7 +649,7 @@ These work without prerequisites:
             app.appId,
             objectType,
             ids,
-            'Manual sync'
+            `${merge ? 'Merge' : 'Replace'} sync`
           );
         }
       }
@@ -650,7 +657,7 @@ These work without prerequisites:
       return {
         content: [{
           type: "text",
-          text: `✅ Successfully synced object IDs for app "${app.name}"`
+          text: `✅ Successfully synced object IDs for app "${app.name}" (${merge ? 'MERGE' : 'REPLACE'} mode)`
         }]
       };
     }
@@ -689,9 +696,10 @@ These work without prerequisites:
 
     const report: Record<string, number[]> = {};
 
-    // Get all consumption at once
+    // Get all consumption at once using pool ID if available (matches VSCode extension behavior)
+    const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
     const request = {
-      appId: app.appId,
+      appId,
       authKey: app.authKey
     };
     const consumptionInfo = await this.backend.getConsumption(request);

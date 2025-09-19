@@ -19,6 +19,8 @@
     "dist",
     "tests",
     "**/*.test.ts",
-    "test-backend-live.ts"
+    "test-backend-live.ts",
+    "test-consumption-report.ts",
+    "test-sync-modes.ts"
   ]
 }

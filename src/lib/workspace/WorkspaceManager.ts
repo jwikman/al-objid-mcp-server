@@ -13,6 +13,7 @@ export interface WorkspaceApp {
   hasObjIdConfig: boolean;
   isAuthorized: boolean;
   authKey?: string;
+  appPoolId?: string;
   ranges?: Array<{ from: number; to: number }>;
 }
 
@@ -124,6 +125,7 @@ export class WorkspaceManager {
       const objIdConfigPath = path.join(appPath, '.objidconfig');
       let hasObjIdConfig = false;
       let authKey: string | undefined;
+      let appPoolId: string | undefined;
       let ranges: Array<{ from: number; to: number }> | undefined;
 
       try {
@@ -131,7 +133,7 @@ export class WorkspaceManager {
         if (stats.isFile()) {
           hasObjIdConfig = true;
 
-          // Load .objidconfig to get auth key and ranges
+          // Load .objidconfig to get auth key, appPoolId and ranges
           const objIdConfigContent = await fs.promises.readFile(objIdConfigPath, 'utf-8');
           try {
             // Remove comments for JSON parsing
@@ -139,6 +141,7 @@ export class WorkspaceManager {
             const objIdConfig = JSON.parse(jsonContent);
 
             authKey = objIdConfig.authKey;
+            appPoolId = objIdConfig.appPoolId;
 
             // Extract ranges from config
             if (objIdConfig.ranges) {
@@ -173,6 +176,7 @@ export class WorkspaceManager {
         hasObjIdConfig,
         isAuthorized: !!authKey,
         authKey,
+        appPoolId,
         ranges: ranges || this.extractRangesFromAppJson(appJson)
       };
 
@@ -313,6 +317,41 @@ export class WorkspaceManager {
       app.isAuthorized = true;
       this.logger.info('App authorization updated', { app: app.name });
     }
+  }
+
+  /**
+   * Get pool ID from app ID if available, matching VSCode extension behavior
+   */
+  getPoolIdFromAppIdIfAvailable(appId: string): string {
+    const app = this.getAppById(appId);
+    if (!app) {
+      return appId;
+    }
+    
+    const { appPoolId } = app;
+    if (!appPoolId) {
+      return appId;
+    }
+
+    if (appPoolId.length !== 64 || !/[0-9A-Fa-f]{6}/g.test(appPoolId)) {
+      this.logger.error('Invalid appPoolId format', { app: app.name, appPoolId });
+      return appId;
+    }
+
+    return appPoolId;
+  }
+
+  /**
+   * Get app by app ID
+   */
+  getAppById(appId: string): WorkspaceApp | undefined {
+    for (const workspace of this.workspaces.values()) {
+      const app = workspace.apps.find(a => a.appId === appId);
+      if (app) {
+        return app;
+      }
+    }
+    return undefined;
   }
 
   /**

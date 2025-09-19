@@ -1,8 +1,13 @@
 {
   "name": "@sshadows/objid-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for AL Object ID Ninja",
+  "version": "1.0.1",
+  "description": "MCP server for AL Object ID Ninja - Provides intelligent object ID management for Microsoft Dynamics 365 Business Central development",
   "main": "dist/server.js",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
@@ -11,16 +16,28 @@
     "test": "jest",
     "test:integration": "jest tests/integration --testTimeout=30000",
     "test:live": "ts-node test-backend-live.ts",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
     "al",
     "business-central",
-    "object-id"
+    "object-id",
+    "dynamics-365",
+    "model-context-protocol",
+    "claude"
   ],
-  "author": "",
+  "author": "SShadowS",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SShadowS/objid-mcp.git"
+  },
+  "homepage": "https://github.com/SShadowS/objid-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/SShadowS/objid-mcp/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "comment-json": "^4.2.5"

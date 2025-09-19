@@ -74,7 +74,7 @@ export class BackendService {
 
   private async sendRequest<T>(
     path: string,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PATCH',
     data?: any,
     usePollBackend = false
   ): Promise<T> {
@@ -232,9 +232,12 @@ export class BackendService {
    */
   async syncIds(request: SyncIdsRequest): Promise<boolean> {
     try {
+      // Use PATCH for merge mode (UPDATE), POST for replace mode - matches VSCode extension
+      const method = request.merge ? 'PATCH' : 'POST';
+      
       await this.sendRequest<void>(
         '/api/v2/syncIds',
-        'POST',
+        method,
         request
       );
       return true;
@@ -249,10 +252,10 @@ export class BackendService {
    */
   async getConsumption(request: GetConsumptionRequest): Promise<ConsumptionInfo | undefined> {
     try {
-      // Send as POST with body instead of GET with query parameters
+      // Send as GET with body (matches VSCode extension behavior)
       const response = await this.sendRequest<ConsumptionInfo>(
         '/api/v2/getConsumption',
-        'POST',
+        'GET',
         request
       );
       return response;
@@ -261,6 +264,7 @@ export class BackendService {
       return undefined;
     }
   }
+
 
   /**
    * Check for updates (polling endpoint)
