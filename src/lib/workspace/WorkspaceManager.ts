@@ -160,10 +160,9 @@ export class WorkspaceManager {
         // .objidconfig doesn't exist
       }
 
-      // Generate app ID (hash of publisher + name + version)
-      const crypto = await import('crypto');
-      const appIdData = `${appJson.publisher}${appJson.name}${appJson.version}`;
-      const appId = crypto.createHash('sha256').update(appIdData).digest('hex');
+      // Generate app ID from the app.json id field (GUID) - matching VS Code extension
+      const { getSha256 } = await import('../utils/crypto');
+      const appId = getSha256(appJson.id);
 
       const app: WorkspaceApp = {
         path: appPath,
