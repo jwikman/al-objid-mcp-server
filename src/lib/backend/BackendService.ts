@@ -74,7 +74,7 @@ export class BackendService {
 
   private async sendRequest<T>(
     path: string,
-    method: 'GET' | 'POST' | 'PATCH',
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     data?: any,
     usePollBackend = false
   ): Promise<T> {
@@ -158,19 +158,19 @@ export class BackendService {
    */
   async checkApp(appId: string): Promise<CheckAppResponse> {
     try {
-      // The v2/checkApp endpoint expects appId in the body and returns a simple string "true" or "false"
+      // The v2/checkApp endpoint uses GET method with appId in the body and returns a simple string "true" or "false"
       const response = await this.sendRequest<string>(
         `/api/v2/checkApp`,
-        'POST',
+        'GET',
         { appId }
       );
-      
+
       // Parse the string response into our expected format
       const isManaged = response === 'true';
-      
+
       // TODO: Get pool information from a different endpoint if needed
       // For now, we just return the basic managed status
-      return { 
+      return {
         managed: isManaged,
         hasPool: false,
         poolId: undefined
@@ -190,11 +190,17 @@ export class BackendService {
   ): Promise<NextObjectIdInfo | undefined> {
     const method = commit ? 'POST' : 'GET';
 
+    // Apply range limiting logic when committing with perRange and require
+    let ranges = request.ranges;
+    if (commit && request.perRange && request.require) {
+      ranges = this.limitRanges(request.ranges, request.require);
+    }
+
     try {
       const response = await this.sendRequest<NextObjectIdInfo>(
         '/api/v2/getNext',
         method,
-        request
+        { ...request, ranges }
       );
       return response;
     } catch (error) {
@@ -204,7 +210,20 @@ export class BackendService {
   }
 
   /**
-   * Authorize an app for ID management
+   * Limit ranges to only the range containing the required ID
+   * (matches Azure backend limitRanges function)
+   */
+  private limitRanges(ranges: ALRanges, require: number): ALRanges {
+    for (const range of ranges) {
+      if (require >= range.from && require <= range.to) {
+        return [range];
+      }
+    }
+    return [];
+  }
+
+  /**
+   * Authorize an app for ID management (POST)
    */
   async authorizeApp(request: AuthorizeAppRequest): Promise<AuthorizationInfo> {
     try {
@@ -214,7 +233,7 @@ export class BackendService {
         'POST',
         request
       );
-      
+
       // Add the authorized flag since our interface expects it
       return {
         authKey: response.authKey || '',
@@ -224,6 +243,51 @@ export class BackendService {
     } catch (error) {
       this.logger.error(`Failed to authorize app ${request.appId}`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Get authorization info for an app (GET)
+   */
+  async getAuthInfo(appId: string, authKey: string): Promise<AuthorizationInfo | undefined> {
+    try {
+      const response = await this.sendRequest<{
+        authorized: boolean;
+        user?: { name: string; email: string };
+        valid?: boolean;
+      }>(
+        '/api/v2/authorizeApp',
+        'GET',
+        { appId, authKey }
+      );
+
+      return {
+        authKey,
+        authorized: response.authorized,
+        user: response.user,
+        valid: response.valid
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get auth info for app ${appId}`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Deauthorize an app (DELETE)
+   */
+  async deauthorizeApp(appId: string, authKey: string): Promise<boolean> {
+    try {
+      const response = await this.sendRequest<{ deleted?: boolean }>(
+        '/api/v2/authorizeApp',
+        'DELETE',
+        { appId, authKey }
+      );
+
+      return !!response.deleted;
+    } catch (error) {
+      this.logger.error(`Failed to deauthorize app ${appId}`, error);
+      return false;
     }
   }
 
@@ -248,6 +312,55 @@ export class BackendService {
   }
 
   /**
+   * Auto-sync IDs for multiple apps in batch
+   */
+  async autoSyncIds(
+    appFolders: Array<{
+      appId: string;
+      authKey?: string;
+      ids: ConsumptionInfo;
+    }>,
+    patch: boolean = false
+  ): Promise<any> {
+    try {
+      const response = await this.sendRequest<any>(
+        '/api/v2/autoSyncIds',
+        patch ? 'PATCH' : 'POST',
+        { appFolders }
+      );
+
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to auto-sync IDs', error);
+      return null;
+    }
+  }
+
+  /**
+   * Store a single ID assignment (POST to add, DELETE to remove)
+   */
+  async storeAssignment(
+    appId: string,
+    authKey: string,
+    type: string,
+    id: number,
+    method: 'POST' | 'DELETE'
+  ): Promise<boolean> {
+    try {
+      const response = await this.sendRequest<{ updated?: boolean }>(
+        '/api/v2/storeAssignment',
+        method,
+        { appId, authKey, type, id }
+      );
+
+      return !!response.updated;
+    } catch (error) {
+      this.logger.error(`Failed to ${method === 'POST' ? 'add' : 'remove'} assignment for app ${appId}`, error);
+      return false;
+    }
+  }
+
+  /**
    * Get consumption data for an app
    */
   async getConsumption(request: GetConsumptionRequest): Promise<ConsumptionInfo | undefined> {
@@ -258,6 +371,18 @@ export class BackendService {
         'GET',
         request
       );
+
+      // Add _total field to match Azure backend behavior
+      if (response) {
+        let total = 0;
+        for (const key of Object.keys(response)) {
+          if (Array.isArray(response[key])) {
+            total += response[key].length;
+          }
+        }
+        (response as any)._total = total;
+      }
+
       return response;
     } catch (error) {
       this.logger.error(`Failed to get consumption for app ${request.appId}`, error);
@@ -285,31 +410,62 @@ export class BackendService {
   }
 
   /**
+   * Check multiple apps for updates (polling endpoint)
+   */
+  async check(
+    payload: Array<{
+      appId: string;
+      authKey?: string;
+      authorization: any;
+    }>
+  ): Promise<any> {
+    try {
+      const response = await this.sendRequest<any>(
+        '/api/v2/check',
+        'GET',
+        payload,
+        true // Use polling backend
+      );
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to check apps for updates', error);
+      return null;
+    }
+  }
+
+  /**
    * Create an app pool
    */
-  async createPool(appId: string, authKey: string, name?: string): Promise<{ poolId: string } | undefined> {
+  async createPool(
+    appId: string,
+    authKey: string,
+    name: string,
+    joinKey: string,
+    managementSecret: string,
+    apps?: Array<{ appId: string; name: string }>,
+    allowAnyAppToManage: boolean = false
+  ): Promise<{ poolId: string; accessKey: string; validationKey: string; managementKey: string; leaveKeys: any } | undefined> {
     try {
-      // Generate simple keys for the pool
-      const poolName = name || `Pool for ${appId}`;
-      const managementSecret = Math.random().toString(36).substring(2, 15);
-      const joinKey = Math.random().toString(36).substring(2, 15);
-      
-      const response = await this.sendRequest<{ poolId: string }>(
+      const response = await this.sendRequest<{
+        poolId: string;
+        accessKey: string;
+        validationKey: string;
+        managementKey: string;
+        leaveKeys: any;
+      }>(
         '/api/v2/createPool',
         'POST',
-        { 
-          appId, 
-          authKey,
-          name: poolName,
-          managementSecret,
+        {
+          name,
           joinKey,
-          apps: [{ appId, name: poolName }],
-          allowAnyAppToManage: false
+          managementSecret,
+          apps: apps || [{ appId, name }],
+          allowAnyAppToManage
         }
       );
       return response;
     } catch (error) {
-      this.logger.error(`Failed to create pool for app ${appId}`, error);
+      this.logger.error(`Failed to create pool`, error);
       return undefined;
     }
   }
@@ -317,17 +473,21 @@ export class BackendService {
   /**
    * Join an app pool
    */
-  async joinPool(appId: string, authKey: string, poolId: string): Promise<boolean> {
+  async joinPool(
+    poolId: string,
+    joinKey: string,
+    apps: Array<{ appId: string; name: string }>
+  ): Promise<any> {
     try {
-      await this.sendRequest<void>(
+      const response = await this.sendRequest<any>(
         '/api/v2/joinPool',
         'POST',
-        { appId, authKey, poolId }
+        { poolId, joinKey, apps }
       );
-      return true;
+      return response;
     } catch (error) {
-      this.logger.error(`Failed to join pool ${poolId} for app ${appId}`, error);
-      return false;
+      this.logger.error(`Failed to join pool ${poolId}`, error);
+      return null;
     }
   }
 

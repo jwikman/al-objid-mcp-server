@@ -29,6 +29,7 @@ export class PollingService extends EventEmitter {
   private pollingTimer?: NodeJS.Timer;
   private config: PollingConfig;
   private lastPollTime: Map<string, number> = new Map();
+  private lastPoolIds: Map<string, string> = new Map(); // Track pool IDs separately
   private isPolling = false;
 
   private constructor() {
@@ -165,8 +166,12 @@ export class PollingService extends EventEmitter {
         ALObjectType.Enum
       ];
 
+      // Use pool ID if available (matches VSCode extension behavior)
+      const workspace = WorkspaceManager.getInstance();
+      const appId = workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+
       const request = {
-        appId: app.appId,
+        appId,
         authKey: app.authKey!
       };
 
@@ -253,38 +258,32 @@ export class PollingService extends EventEmitter {
    */
   private async checkPoolUpdates(app: WorkspaceApp): Promise<void> {
     try {
-      const checkResult = await this.backendService.checkApp(app.appId);
+      // Use pool ID if available (matches VSCode extension behavior)
+      const workspace = WorkspaceManager.getInstance();
+      const appId = workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+      
+      const checkResult = await this.backendService.checkApp(appId);
 
       if (checkResult.hasPool && checkResult.poolId) {
         const cacheKey = `${app.appId}-pool`;
-        const cachedPoolId = this.lastPollTime.get(cacheKey);
+        const cachedPoolId = this.lastPoolIds.get(cacheKey);
 
         // Convert poolId to string for comparison
         const poolIdStr = String(checkResult.poolId);
-        const cachedPoolIdStr = cachedPoolId ? String(cachedPoolId) : undefined;
 
-        if (cachedPoolIdStr !== poolIdStr) {
+        if (cachedPoolId !== poolIdStr) {
           this.emit('update', {
             type: 'pool',
             appId: app.appId,
-            data: {
-              poolId: poolIdStr,
-              previousPoolId: cachedPoolIdStr
-            },
-            timestamp: Date.now()
-          } as UpdateEvent);
-
-          // Store as number to maintain consistency
-          this.lastPollTime.set(cacheKey, Number(poolIdStr));
-
-          this.logger.info('Pool update detected', {
-            app: app.name,
-            poolId: poolIdStr
+            poolId: checkResult.poolId,
+            message: `App joined pool: ${checkResult.poolId}`
           });
+
+          this.lastPoolIds.set(cacheKey, poolIdStr);
         }
       }
     } catch (error) {
-      this.logger.error('Failed to check pool updates', { app: app.name, error });
+      this.logger.error(`Failed to check pool updates for app ${app.appId}`, error);
     }
   }
 
@@ -340,6 +339,7 @@ export class PollingService extends EventEmitter {
    */
   clearCache(): void {
     this.lastPollTime.clear();
+    this.lastPoolIds.clear();
     this.logger.info('Polling cache cleared');
   }
 }

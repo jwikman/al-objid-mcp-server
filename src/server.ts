@@ -497,8 +497,11 @@ These work without prerequisites:
     const objectType = args.objectType as ALObjectType;
     const ranges = args.ranges || app.ranges || [{ from: 50000, to: 99999 }];
 
+    // Use pool ID if available (matches VSCode extension behavior)
+    const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+
     const request = {
-      appId: app.appId,
+      appId,
       type: objectType,
       ranges,
       authKey: app.authKey,
@@ -532,7 +535,7 @@ These work without prerequisites:
     }
 
     return {
-      content: [{ type: "text", text: "No available IDs in the specified ranges" }],
+      content: [{ type: "text", text: `No available IDs in the specified ranges` }],
       isError: true
     };
   }
@@ -572,9 +575,12 @@ These work without prerequisites:
       };
     }
 
+    // Use pool ID if available (matches VSCode extension behavior)
+    const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+
     // For now, use simplified authorization (Phase 4 will add full git integration)
     const request = {
-      appId: app.appId,
+      appId,
       appName: app.name,
       gitUser: 'user',
       gitEmail: 'user@example.com',
