@@ -257,16 +257,16 @@ These work without prerequisites:
     this.logger = Logger.getInstance();
 
     
+    // Log the server mode
+    const mode = process.env.MCP_MODE?.toLowerCase();
+    const actualMode = mode === 'lite' ? 'LITE' : 'FULL';
+    this.logger.info(`AL Object ID Ninja MCP Server starting in ${actualMode} mode`);
+    
     // Log environment variables
     this.logger.info('Environment variables:');
     Object.entries(process.env).forEach(([key, value]) => {
       this.logger.info(`${key}=${value}`);
     });
-    
-    // Log the server mode
-    const mode = process.env.MCP_MODE?.toLowerCase();
-    const actualMode = mode === 'lite' ? 'LITE' : 'FULL';
-    this.logger.info(`AL Object ID Ninja MCP Server starting in ${actualMode} mode`);
 
     // Setup handlers
     this.setupHandlers();
