@@ -256,6 +256,13 @@ These work without prerequisites:
     this.persistence = ConfigPersistence.getInstance();
     this.logger = Logger.getInstance();
 
+    
+    // Log environment variables
+    this.logger.info('Environment variables:');
+    Object.entries(process.env).forEach(([key, value]) => {
+      this.logger.info(`${key}=${value}`);
+    });
+    
     // Log the server mode
     const mode = process.env.MCP_MODE?.toLowerCase();
     const actualMode = mode === 'lite' ? 'LITE' : 'FULL';
