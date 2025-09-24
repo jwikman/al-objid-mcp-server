@@ -1,6 +1,7 @@
 import { Logger } from '../utils/Logger';
 import { BackendService } from '../backend/BackendService';
 import { ALObjectType } from '../types/ALObjectType';
+import { ALRanges } from '../types/ALRange';
 
 export interface FieldInfo {
   tableId: number;
@@ -304,6 +305,94 @@ export class FieldManager {
   ): Promise<boolean> {
     const consumed = await this.getConsumedEnumValueIds(appId, authKey, enumId);
     return !consumed.includes(valueId);
+  }
+
+  /**
+   * Reserve a specific field ID for a table
+   */
+  async reserveFieldId(
+    appId: string,
+    authKey: string,
+    tableId: number,
+    fieldId: number,
+    isExtension: boolean = false
+  ): Promise<boolean> {
+    try {
+      // Field IDs are handled as special object types
+      const objectType = `table_${tableId}` as ALObjectType;
+
+      const response = await this.backendService.getNext({
+        appId,
+        type: objectType,
+        ranges: this.getFieldRanges(isExtension),
+        authKey,
+        perRange: false,
+        require: fieldId
+      }, true);  // Commit = true to reserve
+
+      if (response && response.available) {
+        const reservedId = Array.isArray(response.id) ? response.id[0] : response.id;
+        return reservedId === fieldId;
+      }
+      return false;
+    } catch (error) {
+      this.logger.error(`Failed to reserve field ID ${fieldId} for table ${tableId}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Reserve a specific enum value ID for an enum
+   */
+  async reserveEnumValueId(
+    appId: string,
+    authKey: string,
+    enumId: number,
+    valueId: number,
+    isExtension: boolean = false
+  ): Promise<boolean> {
+    try {
+      // Enum value IDs are handled as special object types
+      const objectType = `enum_${enumId}` as ALObjectType;
+
+      const response = await this.backendService.getNext({
+        appId,
+        type: objectType,
+        ranges: this.getEnumValueRanges(isExtension),
+        authKey,
+        perRange: false,
+        require: valueId
+      }, true);  // Commit = true to reserve
+
+      if (response && response.available) {
+        const reservedId = Array.isArray(response.id) ? response.id[0] : response.id;
+        return reservedId === valueId;
+      }
+      return false;
+    } catch (error) {
+      this.logger.error(`Failed to reserve enum value ${valueId} for enum ${enumId}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get field ranges based on extension status
+   */
+  private getFieldRanges(isExtension: boolean): ALRanges {
+    if (isExtension) {
+      return [{ from: 50000, to: 99999 }];
+    }
+    return [{ from: 1, to: 49999 }];
+  }
+
+  /**
+   * Get enum value ranges based on extension status
+   */
+  private getEnumValueRanges(isExtension: boolean): ALRanges {
+    if (isExtension) {
+      return [{ from: 50000, to: 99999999 }];
+    }
+    return [{ from: 0, to: 49999 }];
   }
 
   /**

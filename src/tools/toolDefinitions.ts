@@ -9,19 +9,23 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // Core ID Management
   {
     name: "get-next-id",
-    description: "Get the next available object ID for a specific type",
+    description: "Get the next available ID for objects or fields without reserving it",
     category: 'core',
     inputSchema: {
       type: "object",
       properties: {
         objectType: {
           type: "string",
-          enum: ["table", "page", "report", "codeunit", "query", "xmlport", "enum"],
-          description: "Type of AL object"
+          enum: ["table", "page", "report", "codeunit", "query", "xmlport", "enum", "field"],
+          description: "Type of AL object or 'field' for field IDs"
         },
-        appPath: {
-          type: "string",
-          description: "Path to the AL app (optional, uses active app if not provided)"
+        parentObjectId: {
+          type: "number",
+          description: "For field IDs: the table ID. For enum values: the enum ID"
+        },
+        isExtension: {
+          type: "boolean",
+          description: "Whether this is for a table/enum extension"
         },
         ranges: {
           type: "array",
@@ -33,9 +37,45 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             }
           },
           description: "Optional custom ranges to search within"
+        },
+        appPath: {
+          type: "string",
+          description: "Path to the AL app (optional, uses active app if not provided)"
         }
       },
       required: ["objectType"]
+    }
+  },
+  {
+    name: "reserve-id",
+    description: "Reserve a specific ID for use",
+    category: 'core',
+    inputSchema: {
+      type: "object",
+      properties: {
+        objectType: {
+          type: "string",
+          enum: ["table", "page", "report", "codeunit", "query", "xmlport", "enum", "field"],
+          description: "Type of AL object or 'field' for field IDs"
+        },
+        id: {
+          type: "number",
+          description: "The specific ID to reserve"
+        },
+        parentObjectId: {
+          type: "number",
+          description: "For field IDs: the table ID. For enum values: the enum ID"
+        },
+        isExtension: {
+          type: "boolean",
+          description: "Whether this is for a table/enum extension"
+        },
+        appPath: {
+          type: "string",
+          description: "Path to the AL app (optional, uses active app if not provided)"
+        }
+      },
+      required: ["objectType", "id"]
     }
   },
   {
