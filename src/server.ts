@@ -7,8 +7,6 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import * as path from 'path';
-import * as fs from 'fs';
 
 import { BackendService } from './lib/backend/BackendService';
 import { ConfigManager } from './lib/config/ConfigManager';
@@ -18,9 +16,9 @@ import { FieldManager } from './lib/field/FieldManager';
 import { PollingService } from './lib/polling/PollingService';
 import { AssignmentManager } from './lib/assignment/AssignmentManager';
 import { ConfigPersistence } from './lib/config/ConfigPersistence';
-import { AppIdentifier } from './lib/utils/AppIdentifier';
-import { Logger, LogLevel } from './lib/utils/Logger';
+import { Logger } from './lib/utils/Logger';
 import { ALObjectType } from './lib/types/ALObjectType';
+import { DEFAULT_EXTENSION_RANGES } from './lib/constants/ranges';
 
 // Define ToolCallResponse locally to match MCP SDK expectations
 type ToolCallResponse = {
@@ -498,13 +496,15 @@ These work without prerequisites:
 
     // Handle field/enum value requests
     if (args.parentObjectId) {
+      const ranges = args.ranges || app.ranges || DEFAULT_EXTENSION_RANGES;
+
       if (args.objectType === 'field' || args.objectType === 'table') {
         // Get field ID
         const fieldId = await this.field.getNextFieldId(
           app.appId,
           app.authKey,
           args.parentObjectId,
-          args.isExtension || false
+          ranges
         );
 
         if (fieldId) {
@@ -526,7 +526,7 @@ These work without prerequisites:
           app.appId,
           app.authKey,
           args.parentObjectId,
-          args.isExtension || false
+          ranges
         );
 
         if (enumValueId) {
@@ -547,7 +547,7 @@ These work without prerequisites:
 
     // Standard object ID request (query only, no commit)
     const objectType = args.objectType as ALObjectType;
-    const ranges = args.ranges || app.ranges || [{ from: 50000, to: 99999 }];
+    const ranges = args.ranges || app.ranges || DEFAULT_EXTENSION_RANGES;
 
     // Use pool ID if available (matches VSCode extension behavior)
     const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
@@ -611,6 +611,8 @@ These work without prerequisites:
 
     // Handle field/enum value reservation
     if (args.parentObjectId) {
+      const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
+
       if (args.objectType === 'field' || args.objectType === 'table') {
         // Reserve field ID
         const success = await this.field.reserveFieldId(
@@ -618,7 +620,7 @@ These work without prerequisites:
           app.authKey,
           args.parentObjectId,
           args.id,
-          args.isExtension || false
+          ranges
         );
 
         if (success) {
@@ -644,7 +646,7 @@ These work without prerequisites:
           app.authKey,
           args.parentObjectId,
           args.id,
-          args.isExtension || false
+          ranges
         );
 
         if (success) {
@@ -668,7 +670,7 @@ These work without prerequisites:
 
     // Standard object ID reservation
     const objectType = args.objectType as ALObjectType;
-    const ranges = app.ranges || [{ from: 50000, to: 99999 }];
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
     const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
 
     // Validate ID is within allowed ranges
@@ -947,7 +949,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetWorkspaceInfo(args: any): Promise<ToolCallResponse> {
+  private async handleGetWorkspaceInfo(_args: any): Promise<ToolCallResponse> {
     const workspace = this.workspace.getCurrentWorkspace();
     
     if (!workspace) {
@@ -1021,11 +1023,12 @@ These work without prerequisites:
       };
     }
 
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
     const fieldId = await this.field.getNextFieldId(
       app.appId,
       app.authKey,
       args.tableId,
-      args.isExtension || false
+      ranges
     );
 
     if (fieldId > 0) {
@@ -1059,11 +1062,12 @@ These work without prerequisites:
       };
     }
 
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
     const valueId = await this.field.getNextEnumValueId(
       app.appId,
       app.authKey,
       args.enumId,
-      args.isExtension || false
+      ranges
     );
 
     if (valueId >= 0) {
@@ -1117,7 +1121,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleCheckRangeOverlaps(args: any): Promise<ToolCallResponse> {
+  private async handleCheckRangeOverlaps(_args: any): Promise<ToolCallResponse> {
     const overlaps = await this.collision.checkRangeOverlaps();
 
     if (overlaps.length === 0) {
@@ -1163,7 +1167,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleStopPolling(args: any): Promise<ToolCallResponse> {
+  private async handleStopPolling(_args: any): Promise<ToolCallResponse> {
     this.polling.stop();
 
     // Update persistence
@@ -1179,7 +1183,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetPollingStatus(args: any): Promise<ToolCallResponse> {
+  private async handleGetPollingStatus(_args: any): Promise<ToolCallResponse> {
     const status = this.polling.getStatus();
 
     return {
@@ -1404,7 +1408,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetPreferences(args: any): Promise<ToolCallResponse> {
+  private async handleGetPreferences(_args: any): Promise<ToolCallResponse> {
     const preferences = this.persistence.getPreferences();
 
     return {
@@ -1415,7 +1419,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleExportConfig(args: any): Promise<ToolCallResponse> {
+  private async handleExportConfig(_args: any): Promise<ToolCallResponse> {
     const config = this.persistence.exportConfig();
 
     return {
@@ -1447,7 +1451,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetStatistics(args: any): Promise<ToolCallResponse> {
+  private async handleGetStatistics(_args: any): Promise<ToolCallResponse> {
     const stats = this.persistence.getStatistics();
 
     const workspace = this.workspace.getCurrentWorkspace();

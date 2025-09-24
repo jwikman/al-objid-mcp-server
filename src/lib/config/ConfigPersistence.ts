@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/Logger';
 import { WorkspaceApp } from '../workspace/WorkspaceManager';
+import { DEFAULT_EXTENSION_RANGES } from '../constants/ranges';
 
 export interface PersistedConfig {
   version: string;
@@ -128,7 +129,7 @@ export class ConfigPersistence {
         patterns: {}
       },
       preferences: {
-        defaultRanges: [{ from: 50000, to: 99999 }],
+        defaultRanges: DEFAULT_EXTENSION_RANGES,
         autoSync: true,
         collisionChecking: true,
         suggestAlternatives: true,

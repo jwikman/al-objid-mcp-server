@@ -2,6 +2,7 @@ import { Logger } from '../utils/Logger';
 import { BackendService } from '../backend/BackendService';
 import { ALObjectType } from '../types/ALObjectType';
 import { ALRanges } from '../types/ALRange';
+import { DEFAULT_EXTENSION_RANGES, DEFAULT_BASE_OBJECT_RANGES, DEFAULT_BASE_ENUM_VALUE_RANGES } from '../constants/ranges';
 
 export interface FieldInfo {
   tableId: number;
@@ -40,18 +41,13 @@ export class FieldManager {
     appId: string,
     authKey: string,
     tableId: number,
-    isExtension: boolean = false
+    ranges: ALRanges = DEFAULT_EXTENSION_RANGES
   ): Promise<number> {
-    this.logger.verbose('Getting next field ID', { appId, tableId, isExtension });
+    this.logger.verbose('Getting next field ID', { appId, tableId, ranges });
 
     try {
       // Field IDs are handled as special object types
       const objectType = `table_${tableId}` as ALObjectType;
-
-      // Determine ranges based on whether it's an extension
-      const ranges = isExtension
-        ? [{ from: 50000, to: 99999 }] // Extension field range
-        : [{ from: 1, to: 49999 }];     // Base app field range
 
       const request = {
         appId,
@@ -70,13 +66,13 @@ export class FieldManager {
         this.logger.info('Next field ID obtained', {
           tableId,
           fieldId,
-          isExtension
+          ranges
         });
         return fieldId;
       }
 
       // No available ID in range
-      this.logger.error('No available field ID', { tableId, isExtension });
+      this.logger.error('No available field ID', { tableId, ranges });
       return 0;
     } catch (error) {
       this.logger.error('Failed to get next field ID', error);
@@ -91,18 +87,13 @@ export class FieldManager {
     appId: string,
     authKey: string,
     enumId: number,
-    isExtension: boolean = false
+    ranges: ALRanges = DEFAULT_EXTENSION_RANGES
   ): Promise<number> {
-    this.logger.verbose('Getting next enum value ID', { appId, enumId, isExtension });
+    this.logger.verbose('Getting next enum value ID', { appId, enumId, ranges });
 
     try {
       // Enum values are handled as special object types
       const objectType = `enum_${enumId}` as ALObjectType;
-
-      // Determine ranges based on whether it's an extension
-      const ranges = isExtension
-        ? [{ from: 50000, to: 99999 }] // Extension value range
-        : [{ from: 0, to: 49999 }];     // Base app value range
 
       const request = {
         appId,
@@ -121,13 +112,13 @@ export class FieldManager {
         this.logger.info('Next enum value ID obtained', {
           enumId,
           valueId,
-          isExtension
+          ranges
         });
         return valueId;
       }
 
       // No available ID in range
-      this.logger.error('No available enum value ID', { enumId, isExtension });
+      this.logger.error('No available enum value ID', { enumId, ranges });
       return -1;
     } catch (error) {
       this.logger.error('Failed to get next enum value ID', error);
@@ -315,7 +306,7 @@ export class FieldManager {
     authKey: string,
     tableId: number,
     fieldId: number,
-    isExtension: boolean = false
+    ranges: ALRanges = DEFAULT_EXTENSION_RANGES
   ): Promise<boolean> {
     try {
       // Field IDs are handled as special object types
@@ -324,7 +315,7 @@ export class FieldManager {
       const response = await this.backendService.getNext({
         appId,
         type: objectType,
-        ranges: this.getFieldRanges(isExtension),
+        ranges,
         authKey,
         perRange: false,
         require: fieldId
@@ -349,7 +340,7 @@ export class FieldManager {
     authKey: string,
     enumId: number,
     valueId: number,
-    isExtension: boolean = false
+    ranges: ALRanges = DEFAULT_EXTENSION_RANGES
   ): Promise<boolean> {
     try {
       // Enum value IDs are handled as special object types
@@ -358,7 +349,7 @@ export class FieldManager {
       const response = await this.backendService.getNext({
         appId,
         type: objectType,
-        ranges: this.getEnumValueRanges(isExtension),
+        ranges,
         authKey,
         perRange: false,
         require: valueId
@@ -376,51 +367,33 @@ export class FieldManager {
   }
 
   /**
-   * Get field ranges based on extension status
-   */
-  private getFieldRanges(isExtension: boolean): ALRanges {
-    if (isExtension) {
-      return [{ from: 50000, to: 99999 }];
-    }
-    return [{ from: 1, to: 49999 }];
-  }
-
-  /**
-   * Get enum value ranges based on extension status
-   */
-  private getEnumValueRanges(isExtension: boolean): ALRanges {
-    if (isExtension) {
-      return [{ from: 50000, to: 99999999 }];
-    }
-    return [{ from: 0, to: 49999 }];
-  }
-
-  /**
    * Suggest field ID range based on context
+   * Note: These are just suggestions - actual ranges should come from app configuration
    */
   suggestFieldIdRange(isExtension: boolean, isSystemTable: boolean): { from: number; to: number } {
     if (isExtension) {
-      // Extension fields always use 50000+ range
-      return { from: 50000, to: 99999 };
+      // Extension fields typically use 50000+ range
+      return DEFAULT_EXTENSION_RANGES[0];
     } else if (isSystemTable) {
-      // System table fields use low range
+      // System table fields typically use low range (subset of base range)
       return { from: 1, to: 9999 };
     } else {
       // Custom table fields can use broader range
-      return { from: 1, to: 49999 };
+      return DEFAULT_BASE_OBJECT_RANGES[0];
     }
   }
 
   /**
    * Suggest enum value ID range based on context
+   * Note: These are just suggestions - actual ranges should come from app configuration
    */
   suggestEnumValueIdRange(isExtension: boolean): { from: number; to: number } {
     if (isExtension) {
-      // Extension enum values use 50000+ range
-      return { from: 50000, to: 99999 };
+      // Extension enum values typically use 50000+ range
+      return DEFAULT_EXTENSION_RANGES[0];
     } else {
-      // Base enum values start from 0
-      return { from: 0, to: 49999 };
+      // Base enum values typically start from 0
+      return DEFAULT_BASE_ENUM_VALUE_RANGES[0];
     }
   }
 }

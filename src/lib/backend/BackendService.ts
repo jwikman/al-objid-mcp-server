@@ -1,4 +1,4 @@
-import { HttpClient, HttpRequest, HttpResponse } from './HttpClient';
+import { HttpClient, HttpRequest } from './HttpClient';
 import { RetryHandler } from './RetryHandler';
 import { ErrorHandler } from './ErrorHandler';
 import { ConfigManager, Config } from '../config/ConfigManager';
@@ -320,7 +320,7 @@ export class BackendService {
       authKey?: string;
       ids: ConsumptionInfo;
     }>,
-    patch: boolean = false
+    patch = false
   ): Promise<any> {
     try {
       const response = await this.sendRequest<any>(
@@ -443,7 +443,7 @@ export class BackendService {
     joinKey: string,
     managementSecret: string,
     apps?: Array<{ appId: string; name: string }>,
-    allowAnyAppToManage: boolean = false
+    allowAnyAppToManage = false
   ): Promise<{ poolId: string; accessKey: string; validationKey: string; managementKey: string; leaveKeys: any } | undefined> {
     try {
       const response = await this.sendRequest<{
