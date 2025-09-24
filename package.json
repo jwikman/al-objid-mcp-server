@@ -17,6 +17,8 @@
     "test:integration": "jest tests/integration --testTimeout=30000",
     "test:live": "ts-node test-backend-live.ts",
     "lint": "eslint src --ext ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

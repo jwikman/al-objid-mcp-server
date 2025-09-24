@@ -46,7 +46,9 @@ export class ConfigManager {
   private static instance: ConfigManager;
   private config: Config | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Private constructor for singleton pattern
+  }
 
   static getInstance(): ConfigManager {
     if (!this.instance) {

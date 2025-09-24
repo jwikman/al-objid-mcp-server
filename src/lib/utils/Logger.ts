@@ -19,7 +19,9 @@ export class Logger {
     'secret'
   ];
 
-  private constructor() {}
+  private constructor() {
+    // Private constructor for singleton pattern
+  }
 
   static getInstance(): Logger {
     if (!this.instance) {
@@ -124,7 +126,7 @@ export class Logger {
     if (typeof data === 'object') {
       const sanitized: any = {};
       for (const key in data) {
-        if (data.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
           const lowerKey = key.toLowerCase();
           const isSensitive = this.sensitiveKeys.some(sensitive =>
             lowerKey.includes(sensitive.toLowerCase())

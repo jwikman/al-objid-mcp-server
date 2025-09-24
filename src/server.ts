@@ -7,8 +7,6 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
-import * as path from 'path';
-import * as fs from 'fs';
 
 import { BackendService } from './lib/backend/BackendService';
 import { ConfigManager } from './lib/config/ConfigManager';
@@ -18,9 +16,9 @@ import { FieldManager } from './lib/field/FieldManager';
 import { PollingService } from './lib/polling/PollingService';
 import { AssignmentManager } from './lib/assignment/AssignmentManager';
 import { ConfigPersistence } from './lib/config/ConfigPersistence';
-import { AppIdentifier } from './lib/utils/AppIdentifier';
-import { Logger, LogLevel } from './lib/utils/Logger';
+import { Logger } from './lib/utils/Logger';
 import { ALObjectType } from './lib/types/ALObjectType';
+import { DEFAULT_EXTENSION_RANGES } from './lib/constants/ranges';
 
 // Define ToolCallResponse locally to match MCP SDK expectations
 type ToolCallResponse = {
@@ -312,6 +310,8 @@ These work without prerequisites:
             // Core ID Management
             case "get-next-id":
               return await this.handleGetNextObjectId(args);
+            case "reserve-id":
+              return await this.handleReserveId(args);
             case "sync-object-ids":
               return await this.handleSyncObjectIds(args);
 
@@ -501,8 +501,60 @@ These work without prerequisites:
       };
     }
 
+    // Handle field/enum value requests
+    if (args.parentObjectId) {
+      const ranges = args.ranges || app.ranges || DEFAULT_EXTENSION_RANGES;
+
+      if (args.objectType === 'field' || args.objectType === 'table') {
+        // Get field ID
+        const fieldId = await this.field.getNextFieldId(
+          app.appId,
+          app.authKey,
+          args.parentObjectId,
+          ranges
+        );
+
+        if (fieldId) {
+          return {
+            content: [{
+              type: "text",
+              text: `Next available field ID for table ${args.parentObjectId}: ${fieldId}\nUse 'reserve-id' to claim this ID.`
+            }]
+          };
+        } else {
+          return {
+            content: [{ type: "text", text: `No available field IDs for table ${args.parentObjectId}` }],
+            isError: true
+          };
+        }
+      } else if (args.objectType === 'enum') {
+        // Get enum value ID
+        const enumValueId = await this.field.getNextEnumValueId(
+          app.appId,
+          app.authKey,
+          args.parentObjectId,
+          ranges
+        );
+
+        if (enumValueId) {
+          return {
+            content: [{
+              type: "text",
+              text: `Next available enum value for enum ${args.parentObjectId}: ${enumValueId}\nUse 'reserve-id' to claim this ID.`
+            }]
+          };
+        } else {
+          return {
+            content: [{ type: "text", text: `No available enum values for enum ${args.parentObjectId}` }],
+            isError: true
+          };
+        }
+      }
+    }
+
+    // Standard object ID request (query only, no commit)
     const objectType = args.objectType as ALObjectType;
-    const ranges = args.ranges || app.ranges || [{ from: 50000, to: 99999 }];
+    const ranges = args.ranges || app.ranges || DEFAULT_EXTENSION_RANGES;
 
     // Use pool ID if available (matches VSCode extension behavior)
     const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
@@ -515,7 +567,8 @@ These work without prerequisites:
       perRange: false
     };
 
-    const result = await this.backend.getNext(request);
+    // Query without committing (GET request)
+    const result = await this.backend.getNext(request, false);
 
     if (result && result.available) {
       // Handle both single ID and array of IDs
@@ -523,12 +576,12 @@ These work without prerequisites:
 
       // Check for collisions
       const collision = await this.collision.checkCollision(objectType, id, app);
-      
+
       if (collision) {
         return {
           content: [{
             type: "text",
-            text: `Next available ID: ${id}\n⚠️ Warning: This ID collides with ${collision.apps.map(a => a.appName).join(', ')}`
+            text: `Next available ${objectType} ID: ${id}\n⚠️ Warning: Potential collision with ${collision.apps.map(a => a.appName).join(', ')}\nUse 'reserve-id' to claim this ID.`
           }]
         };
       }
@@ -536,13 +589,156 @@ These work without prerequisites:
       return {
         content: [{
           type: "text",
-          text: `Next available ${objectType} ID: ${id}`
+          text: `Next available ${objectType} ID: ${id}\nUse 'reserve-id' to claim this ID.`
         }]
       };
     }
 
     return {
       content: [{ type: "text", text: `No available IDs in the specified ranges` }],
+      isError: true
+    };
+  }
+
+  private async handleReserveId(args: any): Promise<ToolCallResponse> {
+    const app = await this.getAppFromPath(args.appPath);
+    if (!app) {
+      return {
+        content: [{ type: "text", text: "No AL app found at the specified path" }],
+        isError: true
+      };
+    }
+
+    if (!app.isAuthorized || !app.authKey) {
+      return {
+        content: [{ type: "text", text: "App is not authorized. Please authorize first." }],
+        isError: true
+      };
+    }
+
+    // Handle field/enum value reservation
+    if (args.parentObjectId) {
+      const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
+
+      if (args.objectType === 'field' || args.objectType === 'table') {
+        // Reserve field ID
+        const success = await this.field.reserveFieldId(
+          app.appId,
+          app.authKey,
+          args.parentObjectId,
+          args.id,
+          ranges
+        );
+
+        if (success) {
+          return {
+            content: [{
+              type: "text",
+              text: `✓ Reserved field ID ${args.id} for table ${args.parentObjectId}`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `✗ Failed to reserve field ID ${args.id} - may already be in use`
+            }],
+            isError: true
+          };
+        }
+      } else if (args.objectType === 'enum') {
+        // Reserve enum value
+        const success = await this.field.reserveEnumValueId(
+          app.appId,
+          app.authKey,
+          args.parentObjectId,
+          args.id,
+          ranges
+        );
+
+        if (success) {
+          return {
+            content: [{
+              type: "text",
+              text: `✓ Reserved enum value ${args.id} for enum ${args.parentObjectId}`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `✗ Failed to reserve enum value ${args.id} - may already be in use`
+            }],
+            isError: true
+          };
+        }
+      }
+    }
+
+    // Standard object ID reservation
+    const objectType = args.objectType as ALObjectType;
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
+    const appId = this.workspace.getPoolIdFromAppIdIfAvailable(app.appId);
+
+    // Validate ID is within allowed ranges
+    const inRange = ranges.some(r => args.id >= r.from && args.id <= r.to);
+    if (!inRange) {
+      return {
+        content: [{
+          type: "text",
+          text: `✗ ID ${args.id} is outside allowed ranges`
+        }],
+        isError: true
+      };
+    }
+
+    const request = {
+      appId,
+      type: objectType,
+      ranges,
+      authKey: app.authKey,
+      perRange: false,
+      require: args.id  // Specific ID to reserve
+    };
+
+    // Commit the reservation (POST request)
+    const result = await this.backend.getNext(request, true);
+
+    if (result && result.available) {
+      const reservedId = Array.isArray(result.id) ? result.id[0] : result.id;
+
+      if (reservedId === args.id) {
+        // Successfully reserved the requested ID
+        // Track the assignment
+        await this.assignment.assignIds(app, {
+          objectType,
+          count: 1,
+          description: `Reserved ${objectType} ID ${args.id}`
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: `✓ Successfully reserved ${objectType} ID: ${args.id}`
+          }]
+        };
+      } else {
+        // Different ID was returned - original was taken
+        return {
+          content: [{
+            type: "text",
+            text: `✗ ID ${args.id} is already taken. Next available: ${reservedId}\nUse 'get-next-id' to find another available ID.`
+          }],
+          isError: true
+        };
+      }
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: `✗ Failed to reserve ${objectType} ID ${args.id}`
+      }],
       isError: true
     };
   }
@@ -760,7 +956,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetWorkspaceInfo(args: any): Promise<ToolCallResponse> {
+  private async handleGetWorkspaceInfo(_args: any): Promise<ToolCallResponse> {
     const workspace = this.workspace.getCurrentWorkspace();
     
     if (!workspace) {
@@ -834,11 +1030,12 @@ These work without prerequisites:
       };
     }
 
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
     const fieldId = await this.field.getNextFieldId(
       app.appId,
       app.authKey,
       args.tableId,
-      args.isExtension || false
+      ranges
     );
 
     if (fieldId > 0) {
@@ -872,11 +1069,12 @@ These work without prerequisites:
       };
     }
 
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
     const valueId = await this.field.getNextEnumValueId(
       app.appId,
       app.authKey,
       args.enumId,
-      args.isExtension || false
+      ranges
     );
 
     if (valueId >= 0) {
@@ -930,7 +1128,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleCheckRangeOverlaps(args: any): Promise<ToolCallResponse> {
+  private async handleCheckRangeOverlaps(_args: any): Promise<ToolCallResponse> {
     const overlaps = await this.collision.checkRangeOverlaps();
 
     if (overlaps.length === 0) {
@@ -976,7 +1174,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleStopPolling(args: any): Promise<ToolCallResponse> {
+  private async handleStopPolling(_args: any): Promise<ToolCallResponse> {
     this.polling.stop();
 
     // Update persistence
@@ -992,7 +1190,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetPollingStatus(args: any): Promise<ToolCallResponse> {
+  private async handleGetPollingStatus(_args: any): Promise<ToolCallResponse> {
     const status = this.polling.getStatus();
 
     return {
@@ -1217,7 +1415,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetPreferences(args: any): Promise<ToolCallResponse> {
+  private async handleGetPreferences(_args: any): Promise<ToolCallResponse> {
     const preferences = this.persistence.getPreferences();
 
     return {
@@ -1228,7 +1426,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleExportConfig(args: any): Promise<ToolCallResponse> {
+  private async handleExportConfig(_args: any): Promise<ToolCallResponse> {
     const config = this.persistence.exportConfig();
 
     return {
@@ -1260,7 +1458,7 @@ These work without prerequisites:
     };
   }
 
-  private async handleGetStatistics(args: any): Promise<ToolCallResponse> {
+  private async handleGetStatistics(_args: any): Promise<ToolCallResponse> {
     const stats = this.persistence.getStatistics();
 
     const workspace = this.workspace.getCurrentWorkspace();

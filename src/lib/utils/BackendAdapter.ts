@@ -1,7 +1,6 @@
 import { BackendService, GetNextRequest, GetConsumptionRequest } from '../backend/BackendService';
 import { ALObjectType } from '../types/ALObjectType';
 import { NextObjectIdInfo } from '../types/NextObjectIdInfo';
-import { ConsumptionInfo } from '../types/ConsumptionInfo';
 
 /**
  * Adapter class to provide compatibility between old and new API signatures

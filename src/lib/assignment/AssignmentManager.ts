@@ -3,6 +3,7 @@ import { BackendService } from '../backend/BackendService';
 import { WorkspaceManager, WorkspaceApp } from '../workspace/WorkspaceManager';
 import { CollisionDetector } from '../collision/CollisionDetector';
 import { ALObjectType } from '../types/ALObjectType';
+import { DEFAULT_EXTENSION_RANGES } from '../constants/ranges';
 import { EventEmitter } from 'events';
 
 export interface AssignmentOptions {
@@ -85,7 +86,7 @@ export class AssignmentManager extends EventEmitter {
       };
     }
 
-    const ranges = options.ranges || app.ranges || [{ from: 50000, to: 99999 }];
+    const ranges = options.ranges || app.ranges || DEFAULT_EXTENSION_RANGES;
     const count = options.count || 1;
     const assignedIds: number[] = [];
     const collisions: Array<{ id: number; conflictingApps: string[] }> = [];
@@ -368,7 +369,7 @@ export class AssignmentManager extends EventEmitter {
       objectType
     });
 
-    const ranges = app.ranges || [{ from: 50000, to: 99999 }];
+    const ranges = app.ranges || DEFAULT_EXTENSION_RANGES;
 
     // Get next available
     const nextRequest = {

@@ -6,7 +6,8 @@ export type ServerMode = 'lite' | 'normal' | 'full';
 const LITE_MODE_TOOLS = [
   'scan-workspace',     // Essential for discovering AL apps
   'set-active-app',     // Required to work with a specific app
-  'get-next-id'         // Core functionality
+  'get-next-id',        // Query available IDs (enhanced)
+  'reserve-id'          // Reserve specific IDs (new)
 ];
 const NORMAL_MODE_TOOLS = [
   // Core ID Management

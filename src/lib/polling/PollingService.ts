@@ -152,7 +152,6 @@ export class PollingService extends EventEmitter {
    */
   private async checkConsumptionUpdates(app: WorkspaceApp): Promise<void> {
     try {
-      const lastPoll = this.lastPollTime.get(`${app.appId}-consumption`) || 0;
       const now = Date.now();
 
       // Get all object types

@@ -1,8 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/Logger';
-import { ConfigManager } from '../config/ConfigManager';
-import { ALObjectType } from '../types/ALObjectType';
 
 export interface WorkspaceApp {
   path: string;
@@ -149,7 +147,7 @@ export class WorkspaceManager {
             } else if (objIdConfig.idRanges) {
               // Support legacy format
               ranges = [];
-              for (const [type, typeRanges] of Object.entries(objIdConfig.idRanges)) {
+              for (const typeRanges of Object.values(objIdConfig.idRanges)) {
                 if (Array.isArray(typeRanges)) {
                   ranges.push(...this.parseRanges(typeRanges));
                 }
